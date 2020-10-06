@@ -1,6 +1,7 @@
 //#include <stdint.h>
-#define F_CPU  14745600
-//#include <util/delay.h>
+//#define F_CPU  14745600
+#define F_CPU  16000000
+#include <util/delay.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/sleep.h> 
@@ -37,7 +38,7 @@ volatile uint8_t isPacketEnds; //0 - пакет ещё принимается, 1 - пакет принят, та
 
 
 //ISR при отправке байта
-ISR (USART0_UDRE_vect) {
+ISR (USART_UDRE_vect) {
 	if (isReceiving == 1) return; //если USART недавно получил байт данных, то он его сразу же отправил
 
 	isReceiving = 0;
@@ -53,7 +54,7 @@ ISR (USART0_UDRE_vect) {
 }
 
 //ISR при получении байта
-ISR (USART0_RX_vect) {
+ISR (USART_RX_vect) {
 	char ReceivedByte;
 	ReceivedByte = UDR0;
 	UDR0 = ReceivedByte;
@@ -61,19 +62,20 @@ ISR (USART0_RX_vect) {
 	isPacketEnds = 0;
 }
 
+
 //ISR таймера-0, 8 bit
 ISR (TIMER0_OVF_vect) {
-	if (TCNT0 > 2) {
-	TCNT0 = 0;
-	if (isReceiving == 0) isPacketEnds = 1;
-	}
+	PORTB = PORTB ^ (1<<PB5); // toggle LED
+	//if (TCNT0 > 2) {
+	//TCNT0 = 0;
+	//if (isReceiving == 0) isPacketEnds = 1;}
 }
 
 
 //ISR таймера-1, 16 bit
 ISR (TIMER1_OVF_vect) {
-	PORTD = PORTD ^ (1<<PD4); // toggle LED
-	TCNT1 = 0xfff0; //устанавливаем начальное значение счётчика
+	PORTB = PORTB ^ (1<<PB5); // toggle LED
+	TCNT1 = 0x0ff0; //устанавливаем начальное значение счётчика
 	timerOverflow++;
 }
 
@@ -115,16 +117,19 @@ mind for your future projects!
 
 
 int main() {
-	DDRD  |= (1<<PD4);	//конфигурим PD4 как выход
-	PORTD = 255;
+	DDRB  |= (1<<PB5);	//конфигурим PD4 как выход
+	PORTB = 255;
 		         
 	cli();
 	timerOverflow = 0;
 	usartInit();
-	timer0Init();
+	//timer0Init();
 	timer1Init();
     //set_sleep_mode(SLEEP_MODE_IDLE);
 	sei();
+
+	//while (1) {}
+
 
 	while(1) {
 
@@ -136,16 +141,16 @@ int main() {
 	UCSR0B |= (1<<UDRIE0);	// Разрешаем прерывание UDRE
 	}
 
-	if (timerOverflow == 20) { //запускаем передачу после 10-и переполнений таймера
+	if (timerOverflow == 30) { //запускаем передачу после 10-и переполнений таймера
 	//usartState = packetSending;
-	timerOverflow = 21;
+	timerOverflow = 31;
 	buffer_index = 0;		// Сбрасываем индекс
 	buffer = data1;
 	UDR0 = buffer[0];		// Отправляем первый байт
 	UCSR0B |= (1<<UDRIE0);	// Разрешаем прерывание UDRE
 	}
 
-	if (timerOverflow == 25) { //запускаем передачу после 10-и переполнений таймера
+	if (timerOverflow == 50) { //запускаем передачу после 10-и переполнений таймера
 	//usartState = packetSending;
 	timerOverflow = 0;
 	buffer_index = 0;		// Сбрасываем индекс
