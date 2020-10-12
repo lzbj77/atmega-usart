@@ -1,3 +1,7 @@
+//Таймаут посылки надо делать в 3.5 символа (8 + 1 + 1 бит)
+//У STM32 для этого есть регистр RTOR. У Atmega такого нет, поэтому считать будет таймером
+//Для скоростей более 19200 допускается использовать тайм-аут в 1.75 мс
+
 //#include <stdint.h>
 //#define F_CPU  14745600
 #define F_CPU  16000000
@@ -13,11 +17,11 @@ unsigned int ubrr = UBRRVAL;
 volatile uint8_t *buffer;
 volatile uint8_t timerOverflow, buffer_index;
 
-volatile unsigned char data1[] = "Packet 001";
-volatile unsigned char data2[] = "2nd packet";
-volatile unsigned char data3[] = "Other byte";
+volatile unsigned char data1[] = "Packet len 12"; //len 13
+volatile unsigned char data2[] = "2nd_06"; //len 6
+volatile unsigned char data3[] = "Third string 16"; //len 15
 
-int buffer_MAX = 4;
+int buffer_MAX = 0;
 
 int i, k, temp = 0;
 char c;
@@ -39,19 +43,20 @@ volatile uint8_t isPacketEnds; //0 - пакет ещё принимается, 1 - пакет принят, та
 
 //ISR при отправке байта
 ISR (USART_UDRE_vect) {
-	if (isReceiving == 1) return; //если USART недавно получил байт данных, то он его сразу же отправил
+	//if (isReceiving == 1) return; //если USART недавно получил байт данных, то он его сразу же отправил
 
 	isReceiving = 0;
+
+	buffer_index++;			// Увеличиваем индекс
 
 	if (buffer_index == buffer_MAX) { // Вывели весь буффер? 
 	UCSR0B &=~ (1<<UDRIE0); // Запрещаем прерывание по опустошению - передача закончена
 	}
 	else {
 	UDR0 = buffer[buffer_index];	// Берем данные из буффера. 
-	}
-	
-	buffer_index++;			// Увеличиваем индекс
 }
+	
+	}
 
 //ISR при получении байта
 ISR (USART_RX_vect) {
@@ -135,24 +140,27 @@ int main() {
 
 	if (timerOverflow == 10) { //запускаем передачу после 10-и переполнений таймера
 	timerOverflow = 11;
+	buffer_MAX = 6;
 	buffer_index = 0;		// Сбрасываем индекс
 	buffer = data2;
 	UDR0 = buffer[0];		// Отправляем первый байт
 	UCSR0B |= (1<<UDRIE0);	// Разрешаем прерывание UDRE
 	}
 
-	if (timerOverflow == 30) { //запускаем передачу после 10-и переполнений таймера
+	if (timerOverflow == 35) { //запускаем передачу после 10-и переполнений таймера
 	//usartState = packetSending;
-	timerOverflow = 31;
+	timerOverflow = 36;
+	buffer_MAX = 13;
 	buffer_index = 0;		// Сбрасываем индекс
 	buffer = data1;
 	UDR0 = buffer[0];		// Отправляем первый байт
 	UCSR0B |= (1<<UDRIE0);	// Разрешаем прерывание UDRE
 	}
 
-	if (timerOverflow == 50) { //запускаем передачу после 10-и переполнений таймера
+	if (timerOverflow == 60) { //запускаем передачу после 10-и переполнений таймера
 	//usartState = packetSending;
 	timerOverflow = 0;
+	buffer_MAX = 15;
 	buffer_index = 0;		// Сбрасываем индекс
 	buffer = data3;
 	UDR0 = buffer[0];		// Отправляем первый байт
